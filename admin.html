@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Lucy Farms – Admin</title>
+<style>
+:root{--bg:#f2f6ec;--s:#fff;--ink:#241d15;--mu:#5f6a57;--lf:#2d6a3e;--li:#fff;--bt:#b02a43;--ln:#d8e1cc}
+@media(prefers-color-scheme:dark){:root{--bg:#17201a;--s:#202c23;--ink:#eef3e6;--mu:#a9b7a0;--lf:#8fd09a;--li:#12301a;--bt:#f08098;--ln:#33443a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,sans-serif}
+.wrap{max-width:960px;margin:auto;padding:20px}
+h1{margin:0 0 12px}h2{margin:24px 0 8px}
+.btn{border:2px solid var(--lf);border-radius:999px;background:var(--lf);color:var(--li);font-weight:700;padding:7px 16px;cursor:pointer}
+.btn.alt{background:none;color:var(--ink);border-color:var(--ink)}.btn.del{background:none;color:var(--bt);border-color:var(--bt)}
+input,select{padding:8px;border:1.5px solid var(--ln);border-radius:8px;background:var(--s);color:var(--ink);font:inherit}
+.box{background:var(--s);border:1px solid var(--ln);border-radius:12px;padding:14px;margin-bottom:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.msg{color:var(--bt);min-height:1.4em}
+img.t{width:48px;height:48px;object-fit:cover;border-radius:8px;background:var(--bg)}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tabs button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+small{color:var(--mu)}
+:focus-visible{outline:3px solid var(--bt);outline-offset:2px}
+</style>
+</head>
+<body><div class="wrap">
+<h1>Lucy Farms admin</h1>
+<p class="msg" id="err" role="alert"></p>
+<div id="login" class="box" hidden>
+ <div class="row"><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password"><button class="btn" id="go">Log in</button></div>
+ <p class="msg" id="lm" role="status"></p>
+</div>
+<div id="denied" class="box" hidden>This account is not an admin. Add it with the last line of setup.sql. <button class="btn alt" onclick="sb.auth.signOut().then(check)">Log out</button></div>
+
+<div id="app" hidden>
+ <div class="row" style="justify-content:space-between"><div class="tabs"><button class="btn alt" id="tP" aria-pressed="true">Products</button><button class="btn alt" id="tO" aria-pressed="false">Orders</button><button class="btn alt" id="tV" aria-pressed="false">Vendors</button></div><button class="btn alt" id="out">Log out</button></div>
+
+ <div id="pv">
+  <h2>Add a product</h2>
+  <div class="box row">
+   <input id="n" placeholder="Name"><input id="u" placeholder="Unit (1 kg)" size="10"><input id="c" placeholder="Category" list="cats" size="12"><datalist id="cats"><option>Vegetables<option>Fruit<option>Beverages<option>Eggs &amp; dairy<option>Pantry</datalist>
+   <input id="p" type="number" min="0" placeholder="Price KSh" style="width:110px"><input id="f" type="file" accept="image/*">
+   <button class="btn" id="add">Add product</button>
+  </div>
+  <p class="msg" id="pm" role="status"></p>
+  <h2>Products</h2><div id="pl"></div>
+ </div>
+
+ <div id="ov" hidden><h2>Orders</h2><div id="ol"></div></div>
+ <div id="vv" hidden><h2>Vendors</h2><div id="vl"></div></div>
+</div>
+</div>
+
+<script>window.onerror=function(m){document.getElementById("err").textContent="Error: "+m};window.onunhandledrejection=function(e){document.getElementById("err").textContent="Error: "+((e.reason&&e.reason.message)||e.reason)}</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* ===== PASTE THE SAME VALUES AS index.html ===== */
+var SUPABASE_URL="https://koocvlmjefkdjhkupvyo.supabase.co";
+var SUPABASE_KEY="sb_publishable_RkX_pRK4msxNE1bQXLVXSw_jmJVNIlX";
+/* =============================================== */
+var sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function money(v){return "KSh "+Math.round(v).toLocaleString("en-KE")}
+function show(w){["login","denied","app"].forEach(function(i){$(i).hidden=i!==w})}
+
+async function check(){
+ var s=(await sb.auth.getSession()).data.session;
+ if(!s){show("login");return}
+ var r=await sb.from("admins").select("user_id").eq("user_id",s.user.id);
+ if(!r.data||!r.data.length){show("denied");return}
+ show("app");loadP();loadO()}
+$("go").onclick=async function(){var r=await sb.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value});
+ if(r.error)$("lm").textContent=r.error.message;else check()};
+$("out").onclick=function(){sb.auth.signOut().then(check)};
+function tab(t){["P","O","V"].forEach(function(k){$("t"+k).setAttribute("aria-pressed",k===t);$({P:"pv",O:"ov",V:"vv"}[k]).hidden=k!==t});if(t==="O")loadO();if(t==="V")loadV()}
+$("tP").onclick=function(){tab("P")};$("tO").onclick=function(){tab("O")};$("tV").onclick=function(){tab("V")};
+
+async function up(file){
+ var path=Date.now()+"-"+file.name.replace(/[^\w.]/g,"_");
+ var r=await sb.storage.from("product-images").upload(path,file);
+ if(r.error)throw r.error;
+ return sb.storage.from("product-images").getPublicUrl(path).data.publicUrl}
+
+$("add").onclick=async function(){
+ var name=$("n").value.trim(),price=parseInt($("p").value,10);
+ if(!name||isNaN(price)){$("pm").textContent="Enter a name and a price.";return}
+ $("pm").textContent="Saving…";
+ try{
+  var img=$("f").files[0]?await up($("f").files[0]):null;
+  var r=await sb.from("products").insert({name:name,unit:$("u").value.trim(),category:$("c").value.trim()||"Vegetables",price:price,image_url:img});
+  if(r.error)throw r.error;
+  ["n","u","c","p","f"].forEach(function(i){$(i).value=""});$("pm").textContent="Added.";loadP()
+ }catch(e){$("pm").textContent="Failed: "+e.message}};
+
+async function loadP(){
+ var r=await sb.from("products").select("*").order("name");
+ $("pl").innerHTML=r.error?"Could not load.":r.data.map(function(p){
+  return '<div class="box row" data-id="'+p.id+'"><img class="t" src="'+esc(p.image_url||"")+'" alt=""><b style="flex:1;min-width:140px">'+esc(p.name)+' <small>'+esc(p.unit)+' · '+esc(p.category)+'</small></b>'
+  +'<input type="number" class="pr" value="'+p.price+'" style="width:100px" aria-label="Price"><label><input type="checkbox" class="st"'+(p.in_stock?" checked":"")+'> In stock</label>'
+  +'<input type="file" class="ph" accept="image/*" aria-label="Change photo" style="max-width:170px"><button class="btn sv">Save</button><button class="btn del dl">Delete</button></div>'}).join("")}
+$("pl").addEventListener("click",async function(e){
+ var b=e.target.closest("button");if(!b)return;var box=b.closest("[data-id]"),id=box.dataset.id;
+ try{
+  if(b.classList.contains("dl")){if(!confirm("Delete this product?"))return;var d=await sb.from("products").delete().eq("id",id);if(d.error)throw d.error}
+  if(b.classList.contains("sv")){var u={price:parseInt(box.querySelector(".pr").value,10),in_stock:box.querySelector(".st").checked},f=box.querySelector(".ph").files[0];
+   if(f)u.image_url=await up(f);var r=await sb.from("products").update(u).eq("id",id);if(r.error)throw r.error;$("pm").textContent="Saved."}
+  loadP()}catch(x){$("pm").textContent="Failed: "+x.message}});
+
+var VS=[];
+function km(a,b,c,d){var r=Math.PI/180,x=(c-a)*r,y=(d-b)*r,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);return 12742*Math.asin(Math.sqrt(h))}
+function wa(ph){ph=String(ph||"").replace(/\D/g,"");if(ph[0]==="0")ph="254"+ph.slice(1);return "https://wa.me/"+ph}
+async function vendors(){var r=await sb.rpc("admin_vendors");VS=r.error?[]:r.data;if(r.error)alert("Vendors: "+r.error.message)}
+function opts(list,cur){return list.map(function(s){return '<option'+(s===cur?" selected":"")+'>'+s+'</option>'}).join("")}
+async function loadO(){
+ await vendors();
+ var r=await sb.from("orders").select("*").order("created_at",{ascending:false});
+ var it=await sb.from("order_items").select("id,order_id,vendor_id,status");
+ if(r.error||it.error){$("ol").textContent="Could not load orders.";return}
+ var by={};it.data.forEach(function(i){(by[i.order_id]=by[i.order_id]||[]).push(i)});
+ $("ol").innerHTML=r.data.length?r.data.map(function(o){
+  var its=by[o.id]||[],cur=its[0]?its[0].vendor_id:null,st=its[0]?its[0].status:"new";
+  var items=(o.items||[]).map(function(i){return esc(i.qty+" × "+i.name+" ("+i.unit+")")}).join(", ");
+  var near=VS.filter(function(v){return v.status==="approved"&&o.lat!=null&&km(o.lat,o.lng,v.lat,v.lng)<=Number(v.radius_km)}).map(function(v){return{v:v,d:km(o.lat,o.lng,v.lat,v.lng)}}).sort(function(a,b){return a.d-b.d});
+  var vo='<option value="">Assign a vendor…</option>'+near.map(function(n){return '<option value="'+n.v.id+'"'+(n.v.id===cur?" selected":"")+'>'+esc(n.v.name)+' · '+n.d.toFixed(1)+' km'+(n.v.verified?" ✔":"")+'</option>'}).join("");
+  var cv=VS.find(function(v){return v.id===cur});
+  return '<div class="box"><b>#'+o.id+'</b> · '+new Date(o.created_at).toLocaleString("en-KE")+' · <b>'+money(o.total)+'</b><br>'+esc(o.customer_name)+' · '+esc(o.phone)+'<br>'+esc(o.address)+(o.lat!=null?' · <a href="https://www.google.com/maps?q='+o.lat+','+o.lng+'" target="_blank" rel="noopener">customer pin</a>':'')+'<br><small>'+items+'</small><br>'
+  +(o.payment_method==="cod"?"Pay on delivery":"M-Pesa code: <b>"+esc(o.mpesa_code)+"</b> (check it against your M-Pesa messages)")+'<br>'
+  +'<div class="row" style="margin-top:6px">Payment <select data-o="'+o.id+'" aria-label="Payment status">'+opts(["pending","paid","delivered","cancelled"],o.status)+'</select>'
+  +'Vendor <select data-a="'+o.id+'" aria-label="Assign vendor">'+vo+'</select>'
+  +'Fulfilment <select data-f="'+o.id+'" aria-label="Fulfilment status">'+opts(["new","assigned","collected","delivered","cancelled"],st)+'</select></div>'
+  +(cv?'<small>Vendor: '+esc(cv.name)+' · <a href="'+wa(cv.phone)+'" target="_blank" rel="noopener">WhatsApp '+esc(cv.phone)+'</a></small>':(near.length?'':'<small style="color:var(--bt)">No approved vendor covers this pin.</small>'))+'</div>'}).join(""):"No orders yet."}
+$("ol").addEventListener("change",async function(e){var s=e.target.closest("select");if(!s)return;var d=s.dataset,r;
+ if(d.o)r=await sb.from("orders").update({status:s.value}).eq("id",d.o);
+ if(d.a)r=await sb.from("order_items").update({vendor_id:s.value||null,status:s.value?"assigned":"new"}).eq("order_id",d.a);
+ if(d.f)r=await sb.from("order_items").update({status:s.value}).eq("order_id",d.f);
+ if(r&&r.error)alert("Failed: "+r.error.message);loadO()});
+
+async function loadV(){await vendors();
+ var it=await sb.from("order_items").select("vendor_id,qty,price,status,vendor_paid"),owe={};
+ (it.data||[]).forEach(function(i){if(i.vendor_id&&i.status==="delivered"&&!i.vendor_paid)owe[i.vendor_id]=(owe[i.vendor_id]||0)+i.qty*i.price});
+ $("vl").innerHTML=VS.length?VS.map(function(v){
+  return '<div class="box" data-v="'+v.id+'"><b>'+esc(v.name)+'</b> · <a href="'+wa(v.phone)+'" target="_blank" rel="noopener">'+esc(v.phone)+'</a> · radius '+v.radius_km+' km · <a href="https://www.google.com/maps?q='+v.lat+','+v.lng+'" target="_blank" rel="noopener">pin</a>'
+  +'<div class="row" style="margin:8px 0"><select class="vs" aria-label="Status">'+opts(["pending","approved","rejected"],v.status)+'</select><label><input type="checkbox" class="ck"'+(v.verified?" checked":"")+'> Verified organic</label><label>Last visit <input type="date" class="vd" value="'+(v.last_visit||"")+'"></label><input class="vn" placeholder="Visit note" value="'+esc(v.visit_note)+'" style="flex:1;min-width:160px"><button class="btn sv">Save</button></div>'
+  +'<div class="row">Owed to this vendor (delivered, unpaid): <b>'+money(owe[v.id]||0)+'</b>'+(owe[v.id]?'<button class="btn alt pd">Mark paid out</button>':'')+'</div></div>'}).join(""):"No vendors yet."}
+$("vl").addEventListener("click",async function(e){var b=e.target.closest("button");if(!b)return;var box=b.closest("[data-v]"),id=box.dataset.v,r;
+ if(b.classList.contains("sv"))r=await sb.from("vendors").update({status:box.querySelector(".vs").value,verified:box.querySelector(".ck").checked,last_visit:box.querySelector(".vd").value||null,visit_note:box.querySelector(".vn").value.trim()||null}).eq("id",id);
+ if(b.classList.contains("pd")){if(!confirm("Mark all delivered items as paid out to this vendor?"))return;r=await sb.from("order_items").update({vendor_paid:true}).eq("vendor_id",id).eq("status","delivered").eq("vendor_paid",false)}
+ if(r&&r.error)alert("Failed: "+r.error.message);loadV()});
+
+check().catch(function(e){show("login");$("err").textContent="Error: "+e.message});
+</script>
+</body>
+</html>

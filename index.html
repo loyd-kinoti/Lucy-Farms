@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lucy Farms – Organic food</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Newsreader:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{--bg:#f2f6ec;--s:#fff;--ink:#241d15;--mu:#5f6a57;--lf:#2d6a3e;--li:#fff;--bt:#b02a43;--ln:#d8e1cc;--h:'Bricolage Grotesque',system-ui,sans-serif}
+@media(prefers-color-scheme:dark){:root{--bg:#17201a;--s:#202c23;--ink:#eef3e6;--mu:#a9b7a0;--lf:#8fd09a;--li:#12301a;--bt:#f08098;--ln:#33443a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.5 'Newsreader',Georgia,serif}
+h1,h2,h3,button,label,.logo{font-family:var(--h)}
+:focus-visible{outline:3px solid var(--bt);outline-offset:2px}
+header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--ln);z-index:5}
+.bar{max-width:1100px;margin:auto;padding:12px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.logo{font-weight:800;font-size:1.5rem;margin-right:auto}.logo span{color:var(--lf)}
+.btn{border:2px solid var(--lf);border-radius:999px;background:var(--lf);color:var(--li);font-weight:700;font-size:.95rem;padding:8px 18px;cursor:pointer}
+.btn.alt{background:none;color:var(--ink);border-color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:default}
+.wrap{max-width:1100px;margin:auto;padding:0 20px}
+.hero{padding:48px 0 16px}
+h1{font-size:clamp(2.4rem,6vw,4.2rem);line-height:1;letter-spacing:-.03em;margin:0 0 12px;font-weight:800}
+.sub{color:var(--mu);margin:0 0 20px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.chip{border:1.5px solid var(--ln);background:var(--s);color:var(--ink);border-radius:999px;padding:6px 15px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;padding-bottom:48px}
+.card{background:var(--s);border:1px solid var(--ln);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px}
+.pic{height:150px;border-radius:10px;background:var(--bg);display:grid;place-items:center;font-size:3rem;overflow:hidden;margin-bottom:6px}
+.pic img{width:100%;height:100%;object-fit:cover}
+.card h3{margin:0;font-size:1.1rem}.card small{color:var(--mu)}
+.foot{margin-top:auto;padding-top:8px;display:flex;justify-content:space-between;align-items:center}
+.price{font:700 1.1rem var(--h)}
+dialog{border:1px solid var(--ln);border-radius:16px;background:var(--s);color:var(--ink);width:min(440px,94vw);padding:22px;max-height:92vh}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+dialog h2{margin:0 0 12px;font-size:1.5rem}
+input,textarea{width:100%;padding:10px;border:1.5px solid var(--ln);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;margin:4px 0 10px}
+label{font-weight:500;font-size:.95rem}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.line{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--ln)}
+.line .n{flex:1}
+.q button{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--ink);background:none;color:var(--ink);cursor:pointer}
+.msg{color:var(--bt);min-height:1.4em;margin:6px 0}
+.pay{border:1.5px solid var(--ln);border-radius:10px;padding:10px;margin:6px 0;display:block}
+.pay input{width:auto;margin:0 8px 0 0}
+.note{background:var(--bg);border-radius:8px;padding:10px;font-size:.95rem;margin:6px 0 10px}
+.ord{border-bottom:1px solid var(--ln);padding:8px 0;font-size:.95rem}
+#lmap{height:300px;border-radius:10px;margin:10px 0}
+</style>
+</head>
+<body>
+<header><div class="bar">
+<span class="logo">Lucy<span> Farms</span></span>
+<span id="who"></span>
+<button class="btn alt" id="authBtn">Log in</button>
+<button class="btn alt" id="ordBtn" hidden>My orders</button>
+<button class="btn" id="cartBtn">Cart (<span id="count">0</span>)</button>
+</div></header>
+
+<main class="wrap">
+<div class="hero"><h1>Organic food, picked for you.</h1><p class="sub">Create an account, fill your cart, and pay by M-Pesa or on delivery.</p></div>
+<p><button class="btn alt" id="locBtn">📍 Set delivery location</button> <span id="locTxt" class="sub"></span></p>
+<div class="chips" id="chips"></div>
+<div class="grid" id="grid"><p class="sub">Loading…</p></div>
+</main>
+
+<dialog id="authD"><h2 id="authT">Log in</h2>
+<label for="em">Email</label><input id="em" type="email" autocomplete="email">
+<label for="pw">Password (6+ characters)</label><input id="pw" type="password" autocomplete="current-password">
+<p class="msg" id="authM" role="status"></p>
+<div class="row"><button class="btn" id="authGo">Log in</button><button class="btn alt" id="authSw">Create an account</button><button class="btn alt" onclick="authD.close()">Close</button></div>
+</dialog>
+
+<dialog id="cartD"><h2>Your cart</h2>
+<div id="items"></div>
+<div class="line"><b class="n">Total</b><b id="total">KSh 0</b></div>
+<div id="co" hidden>
+<label for="nm">Full name</label><input id="nm" autocomplete="name">
+<label for="ph">Phone (07…)</label><input id="ph" type="tel" autocomplete="tel">
+<label for="ad">Delivery address</label><textarea id="ad" rows="2"></textarea>
+<label class="pay"><input type="radio" name="pm" value="cod" checked>Pay on delivery</label>
+<label class="pay"><input type="radio" name="pm" value="mpesa">Pay by M-Pesa now</label>
+<div id="mp" class="note" hidden>Send <b id="mpAmt"></b> to <b>Till number <span id="till"></span></b>, then enter the M-Pesa confirmation code from the SMS.
+<input id="code" placeholder="e.g. SLK4X9ABC2" maxlength="12"></div>
+</div>
+<p class="msg" id="cartM" role="status"></p>
+<div class="row"><button class="btn" id="place">Place order</button><button class="btn alt" onclick="cartD.close()">Keep shopping</button></div>
+</dialog>
+
+<dialog id="locD"><h2>Where should we deliver?</h2><p class="sub" style="margin:0">Tap the map to drop a pin, or use your location. We’ll show what we can supply to you.</p>
+<div id="lmap"></div><div class="row"><button class="btn" id="locGo">Use my location</button><button class="btn alt" id="locOk">Confirm pin</button><button class="btn alt" onclick="locD.close()">Close</button></div><p class="msg" id="locM" role="status"></p></dialog>
+
+<dialog id="ordD"><h2>My orders</h2><div id="ordList"></div><button class="btn alt" onclick="ordD.close()">Close</button></dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* ===== PASTE YOUR OWN VALUES HERE ===== */
+var SUPABASE_URL="https://koocvlmjefkdjhkupvyo.supabase.co";
+var SUPABASE_KEY="sb_publishable_RkX_pRK4msxNE1bQXLVXSw_jmJVNIlX";
+var MPESA_TILL="PASTE_TILL_NUMBER";
+/* ====================================== */
+var sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+var P=[],ALL=[],NEAR={},loc=null,lmap=null,lmk=null,pick=null,cart={},cur="All",user=null,signup=false;
+try{loc=JSON.parse(localStorage.getItem("lf_loc"))}catch(e){}
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function money(v){return "KSh "+Math.round(v).toLocaleString("en-KE")}
+$("till").textContent=MPESA_TILL;
+
+async function load(){
+ var r=await sb.from("products").select("*").eq("in_stock",true).order("name");
+ if(r.error){$("grid").innerHTML='<p class="sub">Could not load products. Check your Supabase settings.<br><small>Details: '+esc(r.error.message)+'</small></p>';return}
+ ALL=r.data;loadNear()}
+async function loadNear(){NEAR={};if(loc){var v=await sb.rpc("near_vendor_ids",{p_lat:loc.lat,p_lng:loc.lng});(v.data||[]).forEach(function(x){NEAR[x]=1})}refilter()}
+function km(a,b,c,d){var r=Math.PI/180,x=(c-a)*r,y=(d-b)*r,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);return 12742*Math.asin(Math.sqrt(h))}
+function refilter(){P=ALL.filter(function(p){if(!p.vendor_id)return true;return loc&&NEAR[p.vendor_id]});
+ $("locTxt").textContent=loc?"Showing produce available near your pin.":"Set your location to see produce available near you.";
+ chips();grid();drawCart()}
+function chips(){var cats=["All"];P.forEach(function(p){if(cats.indexOf(p.category)<0)cats.push(p.category)});
+ $("chips").innerHTML=cats.map(function(c){return '<button class="chip" aria-pressed="'+(c===cur)+'" data-c="'+esc(c)+'">'+esc(c)+'</button>'}).join("")}
+function grid(){$("grid").innerHTML=P.filter(function(p){return cur==="All"||p.category===cur}).map(function(p){
+ return '<article class="card"><div class="pic">'+(p.image_url?'<img src="'+esc(p.image_url)+'" alt="'+esc(p.name)+'" loading="lazy">':'🌿')+'</div><h3>'+esc(p.name)+'</h3><small>'+esc(p.unit)+'</small><div class="foot"><span class="price">'+money(p.price)+'</span><button class="btn" data-add="'+p.id+'">Add</button></div></article>'}).join("")}
+function drawCart(){var t=0,n=0,h="";
+ P.forEach(function(p){var q=cart[p.id];if(!q)return;t+=q*p.price;n+=q;
+  h+='<div class="line"><span class="n">'+esc(p.name)+'</span><span class="q"><button data-dec="'+p.id+'" aria-label="Remove one">−</button> '+q+' <button data-add="'+p.id+'" aria-label="Add one">+</button></span><span>'+money(q*p.price)+'</span></div>'});
+ $("items").innerHTML=h||'<p class="sub">Your cart is empty.</p>';
+ $("total").textContent=money(t);$("count").textContent=n;$("mpAmt").textContent=money(t);
+ $("co").hidden=!n;$("place").disabled=!n}
+document.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;
+ if(b.dataset.c){cur=b.dataset.c;chips();grid()}
+ if(b.dataset.add){cart[b.dataset.add]=(cart[b.dataset.add]||0)+1;drawCart()}
+ if(b.dataset.dec){var k=b.dataset.dec;if(--cart[k]<=0)delete cart[k];drawCart()}});
+$("cartBtn").onclick=function(){$("cartM").textContent="";drawCart();cartD.showModal()};
+document.querySelectorAll("input[name=pm]").forEach(function(r){r.onchange=function(){$("mp").hidden=r.value!=="mpesa"||!r.checked}});
+
+/* accounts */
+function authUI(){$("authBtn").textContent=user?"Log out":"Log in";$("ordBtn").hidden=!user;$("who").textContent=user?user.email:""}
+function mode(s){signup=s;$("authT").textContent=s?"Create an account":"Log in";$("authGo").textContent=s?"Create account":"Log in";$("authSw").textContent=s?"I have an account":"Create an account";$("authM").textContent=""}
+$("authBtn").onclick=function(){if(user){sb.auth.signOut()}else{mode(false);authD.showModal()}};
+$("authSw").onclick=function(){mode(!signup)};
+$("authGo").onclick=async function(){var e=$("em").value.trim(),p=$("pw").value;$("authM").textContent="";
+ var r=signup?await sb.auth.signUp({email:e,password:p}):await sb.auth.signInWithPassword({email:e,password:p});
+ if(r.error){$("authM").textContent=r.error.message;return}
+ if(signup&&!r.data.session){$("authM").textContent="Account created. Check your email to confirm it, then log in.";return}
+ authD.close()};
+sb.auth.onAuthStateChange(function(_e,s){user=s?s.user:null;authUI()});
+sb.auth.getSession().then(function(r){user=r.data.session?r.data.session.user:null;authUI()});
+
+/* orders */
+$("place").onclick=async function(){
+ if(!user){cartD.close();mode(false);$("authM").textContent="Log in or create an account to place your order.";authD.showModal();return}
+ var nm=$("nm").value.trim(),ph=$("ph").value.trim(),ad=$("ad").value.trim(),pm=document.querySelector("input[name=pm]:checked").value,code=$("code").value.trim().toUpperCase();
+ if(!nm||!ph||!ad){$("cartM").textContent="Enter your name, phone and delivery address.";return}
+ if(!loc){$("cartM").textContent="Set your delivery location first, using the 📍 button on the shop page.";return}
+ if(pm==="mpesa"&&code.length<8){$("cartM").textContent="Enter the M-Pesa confirmation code from your SMS.";return}
+ var items=P.filter(function(p){return cart[p.id]}).map(function(p){return{id:p.id,vendor_id:p.vendor_id,name:p.name,unit:p.unit,price:p.price,qty:cart[p.id]}});
+ var total=items.reduce(function(a,i){return a+i.price*i.qty},0);
+ $("place").disabled=true;
+ var r=await sb.from("orders").insert({customer_name:nm,phone:ph,address:ad,items:items,total:total,payment_method:pm,mpesa_code:pm==="mpesa"?code:null,lat:loc.lat,lng:loc.lng}).select("id").single();
+ if(!r.error){var oi=await sb.from("order_items").insert(items.map(function(i){return{order_id:r.data.id,vendor_id:i.vendor_id||null,product_name:i.name,unit:i.unit,qty:i.qty,price:i.price}}));r.error=oi.error}
+ $("place").disabled=false;
+ if(r.error){$("cartM").textContent="Order failed: "+r.error.message;return}
+ cart={};drawCart();$("cartM").textContent="";cartD.close();alert("Order received. We’ll confirm it shortly.")}
+$("ordBtn").onclick=async function(){var r=await sb.from("orders").select("*").order("created_at",{ascending:false});
+ $("ordList").innerHTML=r.error?"<p>Could not load orders.</p>":(r.data.length?r.data.map(function(o){return '<div class="ord"><b>#'+o.id+'</b> · '+new Date(o.created_at).toLocaleDateString("en-KE")+' · '+money(o.total)+' · '+(o.payment_method==="cod"?"Pay on delivery":"M-Pesa")+'<br>Status: <b>'+esc(o.status)+'</b></div>'}).join(""):"<p>No orders yet.</p>");
+ ordD.showModal()};
+/* delivery location */
+function setPick(a,b){pick={lat:a,lng:b};if(lmk)lmk.setLatLng([a,b]);else lmk=L.marker([a,b]).addTo(lmap);lmap.setView([a,b],Math.max(lmap.getZoom(),14))}
+function initLmap(){if(!lmap){lmap=L.map("lmap").setView(loc?[loc.lat,loc.lng]:[-1.2864,36.8172],loc?14:11);
+ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(lmap);
+ lmap.on("click",function(e){setPick(e.latlng.lat,e.latlng.lng)})}
+ lmap.invalidateSize();if(loc&&!lmk)setPick(loc.lat,loc.lng)}
+$("locBtn").onclick=function(){$("locM").textContent="";locD.showModal();setTimeout(initLmap,50)};
+$("locGo").onclick=function(){if(!navigator.geolocation){$("locM").textContent="Location isn’t available. Tap the map instead.";return}
+ navigator.geolocation.getCurrentPosition(function(p){setPick(p.coords.latitude,p.coords.longitude)},function(){$("locM").textContent="Couldn’t get your location. Tap the map instead."})};
+$("locOk").onclick=function(){if(!pick){$("locM").textContent="Tap the map to drop a pin first.";return}
+ loc=pick;try{localStorage.setItem("lf_loc",JSON.stringify(loc))}catch(e){}locD.close();loadNear()};
+load();authUI();drawCart();
+</script>
+</body>
+</html>
